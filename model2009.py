@@ -17,6 +17,9 @@ numberRegex = re.compile("[0-9]+|[0-9]+\\.[0-9]+|[0-9]+[0-9,]+")
 def normalize(word):
     return 'NUM' if numberRegex.match(word) else word.lower()
 
+train_data = Path() # Path to training data
+dev_data = Path() # Path to development data
+
 
     
 def extract_targets(sent, preds, roles):
