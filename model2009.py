@@ -9,7 +9,7 @@ from torch.nn.init import *
 from torch import optim
 from operator import itemgetter
 import numpy as np
-import utils
+import utils2009
 import imp
 
 
@@ -26,7 +26,7 @@ def extract_targets(sent, preds, roles):
             target_tensor[i][j] = roles[sent[j][4][i]]
     return torch.tensor(target_tensor, dtype=torch.long)
     
-w2i, p2i, l2i, r2i, words, pos, lems = list(utils.vocab(train_data))
+w2i, p2i, l2i, r2i, words, pos, lems = list(utils2009.vocab(train_data))
 
 external_embedding_fp = open('../sskip.100.vectors', 'r')
 external_embedding_fp.readline()
