@@ -137,3 +137,24 @@ for epoch in range(10):
         return role_scores
         
         
+loss_function = nn.NLLLoss()
+optimizer = optim.SGD(my_model.parameters(), lr=0.01)
+my_model = SynAg(w2i, p2i, l2i, r2i, words, pos, lems)
+
+for epoch in range(10):
+    print(epoch)
+    for sent in train_sentences[0:5]:
+
+        sent_preds = [x for x in sent if x[3][0] == 'V*']
+
+    
+        targs = extract_targets(sent, sent_preds, r2i)
+    
+        my_model.zero_grad()
+        scores = my_model(sent, sent_preds)
+        n_scores = scores.permute(0, 2, 1)
+    
+        loss = loss_function(n_scores, targs)
+        print(loss)
+        loss.backward()
+        optimizer.step()
