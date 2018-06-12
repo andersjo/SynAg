@@ -128,7 +128,7 @@ for epoch in range(10):
     
         targs = utils2012.extract_targets(sent, sent_preds, r2i)
     
-        my_model.zero_grad()
+        optimizer.zero_grad()
         scores = my_model(sent, sent_preds)
         n_scores = scores.permute(0, 2, 1)
     
@@ -138,7 +138,7 @@ for epoch in range(10):
         optimizer.step()
 
 
-#### Below is my attempt at predicting role labels, not working yet
+#### Below is my attempt at predicting role labels
 train_ex = train_sentences[1]
 preds_ex = [x for x in train_ex if x[3][0] == 'V*']
 
