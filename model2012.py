@@ -136,3 +136,18 @@ for epoch in range(10):
         print(loss)
         loss.backward()
         optimizer.step()
+
+
+#### Below is my attempt at predicting role labels, not working yet
+train_ex = train_sentences[1]
+preds_ex = [x for x in train_ex if x[3][0] == 'V*']
+
+with torch.no_grad():
+    tag_scores = my_model(train_ex, preds_ex)
+
+    #print(tag_scores)
+    
+for i in range(tag_scores.shape[0]):
+    for j in range(tag_scores.shape[1]):
+        val, idx = tag_scores[i][j].max(0)
+        print(role_list[idx])
