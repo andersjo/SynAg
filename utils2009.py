@@ -5,7 +5,6 @@ numberRegex = re.compile("[0-9]+|[0-9]+\\.[0-9]+|[0-9]+[0-9,]+");
 import shutil
 import torch.nn as nn
 import torch.nn.functional as F
-
 from torch.nn.init import *
 from torch import optim
 
@@ -97,3 +96,10 @@ def extract_sent(data, emb_dict):
     f.close()
     
     return sent_list
+
+def extract_targets(sent, preds, roles):
+    target_tensor = torch.zeros(len(preds), len(sent))
+    for i in range(len(preds)):
+        for j in range(len(sent)):
+            target_tensor[i][j] = roles[sent[j][4][i]]
+    return torch.tensor(target_tensor, dtype=torch.long)
