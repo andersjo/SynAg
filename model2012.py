@@ -8,7 +8,7 @@ from torch.nn.init import *
 from torch import optim
 from operator import itemgetter
 import numpy as np
-import SynAg_utils
+import utils2012
 import imp
 
 
@@ -25,8 +25,18 @@ def extract_targets(sent, preds, roles):
         for j in range(len(sent)):
             target_tensor[i][j] = roles[sent[j][3][i]]
     return torch.tensor(target_tensor, dtype=torch.long)
+
+external_embedding_fp = open('../sskip.100.vectors', 'r')
+external_embedding_fp.readline()
+external_embedding = {line.split(' ')[0]: [float(f) for f in line.strip().split(' ')[1:]] for line in
+                            external_embedding_fp}
+external_embedding_fp.close()
+
+
+w2i, p2i, l2i, r2i, words, pos, lems = list(utils2012.vocab(train_data))
     
-train_sentences = extract_sent(train_data, external_embedding)
+
+train_sentences = utils2012.extract_sent(train_data, external_embedding)
 role_list = list(r2i.keys())
 
 
@@ -46,29 +56,6 @@ class SynAg(nn.Module):
         self.word_emb = nn.Embedding(len(word_vocab), 100)
         self.pos_emb = nn.Embedding(len(pos_vocab), 16)
         self.lem_emb = nn.Embedding(len(lem_vocab), 100)
-        
-        
-loss_function = nn.NLLLoss()
-optimizer = optim.SGD(my_model.parameters(), lr=0.01)
-my_model = SynAg(w2i, p2i, l2i, r2i, words, pos, lems)
-
-for epoch in range(10):
-    print(epoch)
-    for sent in train_sentences[0:5]:
-
-        sent_preds = [x for x in sent if x[3][0] == 'V*']
-
-    
-        targs = extract_targets(sent, sent_preds, r2i)
-    
-        my_model.zero_grad()
-        scores = my_model(sent, sent_preds)
-        n_scores = scores.permute(0, 2, 1)
-    
-        loss = loss_function(n_scores, targs)
-        print(loss)
-        loss.backward()
-        optimizer.step()
         
         self.arch = nn.LSTM(input_size=316, hidden_size = 512, num_layers = 1, bidirectional = True, batch_first= True )
         
