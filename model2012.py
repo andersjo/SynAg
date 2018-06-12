@@ -59,7 +59,7 @@ class SynAg(nn.Module):
         for pred in preds:
             n = 0
             for word in sent:
-                ran_word_emb = self.word_emb(torch.tensor(self.w2i[normalize(word[0][0])]))
+                ran_word_emb = self.word_emb(torch.tensor(self.w2i[utils2012.normalize(word[0][0])]))
             
                 if word[0][1] == 'KNOWN':
                     if word[0][0] == '/.':
@@ -67,7 +67,7 @@ class SynAg(nn.Module):
                     else:
                         pre_emb = torch.tensor(external_embedding[word[0][0]])
                 else:
-                    pre_emb = self.word_emb(torch.tensor(self.w2i[normalize(word[0][0])]))
+                    pre_emb = self.word_emb(torch.tensor(self.w2i[utils2012.normalize(word[0][0])]))
             
                 if word[0][0] == pred[0][0]:
                     ran_lem_emb = self.lem_emb(torch.tensor(self.l2i[word[1]]))
