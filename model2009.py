@@ -4,7 +4,6 @@ from pathlib import Path
 import shutil
 import torch.nn as nn
 import torch.nn.functional as F
-# from torch.nn import Parameter
 from torch.nn.init import *
 from torch import optim
 from operator import itemgetter
@@ -19,8 +18,6 @@ def normalize(word):
 
 train_data = Path() # Path to training data
 dev_data = Path() # Path to development data
-
-
     
 def extract_targets(sent, preds, roles):
     target_tensor = torch.zeros(len(preds), len(sent))
@@ -36,6 +33,8 @@ external_embedding_fp.readline()
 external_embedding = {line.split(' ')[0]: [float(f) for f in line.strip().split(' ')[1:]] for line in
                             external_embedding_fp}
 external_embedding_fp.close()
+
+train_sents = utils2009.extract_sent(train_data, external_embedding)
 
 
 
@@ -123,10 +122,9 @@ class SynAg(nn.Module):
         return role_scores 
         
         
-        
+my_model = SynAg(w2i, p2i, l2i, r2i, words, pos, lems)        
 loss_function = nn.NLLLoss()
 optimizer = optim.SGD(my_model.parameters(), lr=0.01)
-my_model = SynAg(w2i, p2i, l2i, r2i, words, pos, lems)
 
 for sent in train_sents[0:100]:
     sent_preds = [x for x in sent if x[3] == 'Y']
