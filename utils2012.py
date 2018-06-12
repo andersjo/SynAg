@@ -12,6 +12,7 @@ from operator import itemgetter
 
 import numpy as np
 
+
 class ConllEntry:
     def __init__(self, word, lemma, pos, args):
 
@@ -67,6 +68,7 @@ def write_conll(fn, conll_gen):
 def normalize(word):
     return 'NUM' if numberRegex.match(word) else word.lower()
 
+
 def extract_sent(data, emb_dict):
 
     h = open(data, 'r')
@@ -81,7 +83,7 @@ def extract_sent(data, emb_dict):
             del(tok[-1])
             
         if len(tok)>11:
-            if tok[3] in external_embedding.keys() or tok[3] == '/.':
+            if tok[3] in emb_dict.keys() or tok[3] == '/.':
                 pre_emb = "KNOWN"
             else:
                 pre_emb = 'UNK'
@@ -98,3 +100,10 @@ def extract_sent(data, emb_dict):
 
     return sent_list
     h.close()
+    
+def extract_targets(sent, preds, roles):
+    target_tensor = torch.zeros(len(preds), len(sent))
+    for i in range(len(preds)):
+        for j in range(len(sent)):
+            target_tensor[i][j] = roles[sent[j][3][i]]
+    return torch.tensor(target_tensor, dtype=torch.long)
