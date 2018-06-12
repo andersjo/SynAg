@@ -139,15 +139,25 @@ for epoch in range(10):
 
 
 #### Below is my attempt at predicting role labels
-train_ex = train_sentences[1]
-preds_ex = [x for x in train_ex if x[3][0] == 'V*']
+correct = 0
+total = 0
 
-with torch.no_grad():
-    tag_scores = my_model(train_ex, preds_ex)
-
-    #print(tag_scores)
+for sent in train_sentences[50:100]:
+    preds = [x for x in sent if x[3][0] == 'V*']
+    targs = utils2012.extract_targets(sent, preds, r2i)
     
-for i in range(tag_scores.shape[0]):
-    for j in range(tag_scores.shape[1]):
-        val, idx = tag_scores[i][j].max(0)
-        print(role_list[idx])
+    with torch.no_grad():
+        tag_scores = my_model(sent, preds)
+        
+
+    
+    for i in range(tag_scores.shape[0]):
+        for j in range(tag_scores.shape[1]):
+            total += 1
+            val, idx = tag_scores[i][j].max(0)
+            #print(role_list[idx])
+            if idx == targs[i][j]:
+                correct +=1
+                
+print("accuracy =", (100.0*correct)/total)
+
