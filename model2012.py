@@ -1,6 +1,6 @@
-import re
 from collections import Counter
-from pathlib import Path
+import re
+numberRegex = re.compile("[0-9]+|[0-9]+\\.[0-9]+|[0-9]+[0-9,]+");
 import shutil
 import torch.nn as nn
 import torch.nn.functional as F
@@ -8,23 +8,11 @@ from torch.nn.init import *
 from torch import optim
 from operator import itemgetter
 import numpy as np
-import utils2012
+
 import imp
+import utils2012
+imp.reload(utils2012)
 
-
-numberRegex = re.compile("[0-9]+|[0-9]+\\.[0-9]+|[0-9]+[0-9,]+")
-def normalize(word):
-    return 'NUM' if numberRegex.match(word) else word.lower()
-
-train_data = Path() # Path to training data
-dev_data = Path() # Path to development data
-
-def extract_targets(sent, preds, roles):
-    target_tensor = torch.zeros(len(preds), len(sent))
-    for i in range(len(preds)):
-        for j in range(len(sent)):
-            target_tensor[i][j] = roles[sent[j][3][i]]
-    return torch.tensor(target_tensor, dtype=torch.long)
 
 external_embedding_fp = open('../sskip.100.vectors', 'r')
 external_embedding_fp.readline()
@@ -32,16 +20,14 @@ external_embedding = {line.split(' ')[0]: [float(f) for f in line.strip().split(
                             external_embedding_fp}
 external_embedding_fp.close()
 
+train_data = () # path to training data
 
 w2i, p2i, l2i, r2i, words, pos, lems = list(utils2012.vocab(train_data))
-    
-
 train_sentences = utils2012.extract_sent(train_data, external_embedding)
 role_list = list(r2i.keys())
 
-
 class SynAg(nn.Module):
-    def __init__(self, w2i, p2i, l2i, r2i, word_vocab, pos_vocab, lem_vocab):
+    def __init__(self, w2i, p2i, l2i, r2i, word_vocab, pos_vocab, lem_vocab, hidden_size, cell_size, num_layers):
         super().__init__()
         
         self.w2i = w2i
@@ -57,9 +43,13 @@ class SynAg(nn.Module):
         self.pos_emb = nn.Embedding(len(pos_vocab), 16)
         self.lem_emb = nn.Embedding(len(lem_vocab), 100)
         
-        self.arch = nn.LSTM(input_size=316, hidden_size = 512, num_layers = 1, bidirectional = True, batch_first= True )
+        self.hidden_size = hidden_size
+        self.cell_size = cell_size
+        self.num_layers = num_layers
         
-        self.cell_to_role = nn.Linear(2048, len(r2i))
+        self.arch = nn.LSTM(input_size=316, hidden_size = self.hidden_size, num_layers = self.num_layers, bidirectional = True, batch_first= True )
+        
+        self.cell_to_role = nn.Linear(4*self.hidden_size, len(r2i))
         
         
     def repn(self, sent, preds):
@@ -100,13 +90,13 @@ class SynAg(nn.Module):
 
         sent_tensor, pred_idxs = self.repn(sent, preds)
         #print("shape of sent_tensor = ", sent_tensor.shape)        
-        self.hidden = torch.randn(2, len(preds), 512)
-        self.cell = torch.randn(2, len(preds), 512)           
+        self.hidden = torch.randn(2*self.num_layers, len(preds), self.hidden_size)
+        self.cell = torch.randn(2*self.num_layers, len(preds), self.cell_size)           
 
         lstm_out, (self.hidden, self.cell) = self.arch(sent_tensor, (self.hidden, self.cell))
         #print("lstm_output shape is ", lstm_out.shape)
        
-        pred_tensor = torch.randn(len(preds), len(sent), 2048)
+        pred_tensor = torch.randn(len(preds), len(sent), 4*self.hidden_size)
         for m in range(len(preds)):
             for n in range(len(sent)):
                 pred_tensor[m][n] = torch.cat((lstm_out[m][n], lstm_out[m][pred_idxs[m]]))
@@ -124,18 +114,19 @@ class SynAg(nn.Module):
         return role_scores
         
         
+my_model = SynAg(w2i, p2i, l2i, r2i, words, pos, lems, 512, 512, 1)
 loss_function = nn.NLLLoss()
 optimizer = optim.SGD(my_model.parameters(), lr=0.01)
-my_model = SynAg(w2i, p2i, l2i, r2i, words, pos, lems)
+
 
 for epoch in range(10):
     print(epoch)
-    for sent in train_sentences[0:5]:
+    for sent in train_sentences[0:50]:
 
         sent_preds = [x for x in sent if x[3][0] == 'V*']
 
     
-        targs = extract_targets(sent, sent_preds, r2i)
+        targs = utils2012.extract_targets(sent, sent_preds, r2i)
     
         my_model.zero_grad()
         scores = my_model(sent, sent_preds)
