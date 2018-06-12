@@ -137,4 +137,25 @@ for epoch in range(10):
         optimizer.step()
     
     
+## Predictions    
+correct = 0
+total = 0
+
+for sent in train_sents[50:100]:
+    preds = [x for x in sent if x[3] == 'Y']
+    targs = utils2009.extract_targets(sent, preds, r2i)
     
+    with torch.no_grad():
+        tag_scores = my_model(sent, preds)
+        
+
+    
+    for i in range(tag_scores.shape[0]):
+        for j in range(tag_scores.shape[1]):
+            total += 1
+            val, idx = tag_scores[i][j].max(0)
+            #print(role_list[idx])
+            if idx == targs[i][j]:
+                correct +=1
+                
+print("accuracy =", (100.0*correct)/total)
