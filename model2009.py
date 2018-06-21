@@ -24,6 +24,7 @@ dev_data = Path() # Path to data
 
 w2i, p2i, l2i, r2i, words, pos, lems = list(utils2009.vocab(train_data))
 train_sents = utils2009.extract_sent(train_data, external_embedding)
+dev_sents = utils2009.extract_sent(dev_data, external_embedding)
 role_list = list(r2i.keys())
 
 class SynAg(nn.Module):
