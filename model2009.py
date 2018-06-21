@@ -39,9 +39,9 @@ class SynAg(nn.Module):
         self.pos_vocab = pos_vocab
         self.lem_vocab = lem_vocab
         
-        self.word_emb = nn.Embedding(len(word_vocab), 100)
-        self.pos_emb = nn.Embedding(len(pos_vocab), 16)
-        self.lem_emb = nn.Embedding(len(lem_vocab), 100)
+        self.word_emb = nn.Embedding(len(self.word_vocab), 100)
+        self.pos_emb = nn.Embedding(len(self.pos_vocab), 16)
+        self.lem_emb = nn.Embedding(len(self.lem_vocab), 100)
         
         self.hidden_size = hidden_size
         self.cell_size = cell_size
@@ -49,94 +49,155 @@ class SynAg(nn.Module):
         
         self.arch = nn.LSTM(input_size=316, hidden_size = self.hidden_size, num_layers = self.num_layers, bidirectional = True, batch_first= True )
         
-        self.cell_to_role = nn.Linear(4*self.hidden_size, len(self.r2i))
-        
-        
-    def repn(self, sent, preds):
-        m = 0
-        pred_idxs = []
-        rep_tensor = torch.randn(len(preds), len(sent), 316)
-        for pred in preds:
-            n = 0
-            for word in sent:
+        self.cell_to_role = nn.Linear(4*self.hidden_size, len(r2i), bias = False)     
 
-                ran_word_emb = self.word_emb(torch.tensor(self.w2i[utils2009.normalize(word[0][0])]))
-            
-                if word[0][1] == 'KNOWN':
-                    if word[0][0] == '.':
-                        pre_emb = torch.tensor(external_embedding['</s>'])
-                    else:
-                        pre_emb = torch.tensor(external_embedding[word[0][0]])
-                else:
-                    pre_emb = self.word_emb(torch.tensor(self.w2i[utils2009.normalize(word[0][0])]))
-            
-                if word[0][0] == pred[0][0]:
-                    ran_lem_emb = self.lem_emb(torch.tensor(self.l2i[word[1]]))
-                    pred_idxs.append(sent.index(word))
-                
-                else:
-                    ran_lem_emb = torch.zeros((100))
-                    
-                ran_pos_emb = self.pos_emb(torch.tensor(self.p2i[word[2]]))
-            
-                new_ent = torch.cat((ran_word_emb, pre_emb, ran_lem_emb, ran_pos_emb))
-                rep_tensor[m][n] = new_ent
-
-                n = n + 1
-            m = m + 1
-            
-        return rep_tensor, pred_idxs
+    def repn(self, sents):
+        count = 0
+        pred_count = 0
+        sent_count = 0
+        rep_dict = {}
+        rep_len = {}
+  
+        self.pred_idxs_dict = {}
     
-    def forward(self, sent, preds):
-
-        sent_tensor, pred_idxs = self.repn(sent, preds)
-        #print("shape of sent_tensor = ", sent_tensor.shape)        
-        self.hidden = torch.randn(2*self.num_layers, len(preds), self.hidden_size)
-        self.cell = torch.randn(2*self.num_layers, len(preds), self.cell_size)           
-
-        lstm_out, (self.hidden, self.cell) = self.arch(sent_tensor, (self.hidden, self.cell))
-        #print("lstm_output shape is ", lstm_out.shape)
-       
-        pred_tensor = torch.randn(len(preds), len(sent), 4*self.hidden_size)
-        for m in range(len(preds)):
-            for n in range(len(sent)):
-                pred_tensor[m][n] = torch.cat((lstm_out[m][n], lstm_out[m][pred_idxs[m]]))
+        sent_order_dict = {}
+        sent_order_count = 0
         
-        #print("shape of pred_tensor", pred_tensor.shape)
+        for sent in sents:         
+            sent_preds = [x for x in sent if x[3] == 'Y']
+            ord_pred_count = 0
+            
+            for pred in sent_preds:
+                rep_list = []
+                ord_pred_count +=1
 
+                for word in sent:
+                    if utils2009.normalize(word[0][0]) in self.w2i:
+                        ran_word_emb = self.word_emb(torch.tensor(self.w2i[utils2009.normalize(word[0][0])]))
         
+                        if word[0][1] == 'KNOWN':
+                            if word[0][0] == '.':
+                                pre_emb = torch.tensor(external_embedding['</s>'])
+                            else:
+                                pre_emb = torch.tensor(external_embedding[word[0][0]])
+                        else:
+                            pre_emb = self.word_emb(torch.tensor(self.w2i[utils2009.normalize(word[0][0])]))
+            
+                    else:
+                        ran_word_emb = torch.randn(100)
+                        pre_word_emb = torch.randn(100)
+            
+                    if word[0][0] == pred[0][0]:
+                        
+                        if word[1] in self.l2i:
+                            ran_lem_emb = self.lem_emb(torch.tensor(self.l2i[word[1]]))
+                        else:
+                            ran_lem_emb = torch.randn(100)
+                        self.pred_idxs_dict[pred_count] = (sent.index(word), sent_count)
+                        pred_count += 1
+                 
+                    else:
+                        ran_lem_emb = torch.zeros((100))
+                    
+                    ran_pos_emb = self.pos_emb(torch.tensor(self.p2i[word[2]]))            
+                    new_ent = torch.cat((ran_word_emb, pre_emb, ran_lem_emb, ran_pos_emb))
+
+                    rep_list.append(new_ent)
+                
+                rep_tensor = torch.stack([x for x in rep_list])
+                rep_dict[count] = rep_tensor
+
+                rep_len[count] = rep_tensor.shape[0]
+                sent_order_dict[count] = (sent_order_count, ord_pred_count-1)
+                count += 1
+                
+            sent_count +=1
+            sent_order_count +=1
+            
+        sorted_lengths = sorted(rep_len.items(), key=operator.itemgetter(1), reverse=True)
+        sorted_sentences = [rep_dict[x[0]] for x in sorted_lengths]
+        sent_lens = [x.shape[0] for x in sorted_sentences]
+        packed_seq = rnn_utils.pack_sequence(sorted_sentences)
+        
+        self.sorted_idxs = [self.pred_idxs_dict[x[0]] for x in sorted_lengths]
+        sent_order_list = [sent_order_dict[x[0]] for x in sorted_lengths]
+
+        return packed_seq, sent_lens, sent_order_list    
+
+    def forward(self, sents):
+        packed_sequence, packed_lengths, order_list = self.repn(sents)     
+        
+        self.hidden = torch.randn(2*self.num_layers, len(packed_lengths), self.hidden_size)
+        self.cell = torch.randn(2*self.num_layers, len(packed_lengths), self.cell_size) 
+        
+        lstm_out, (self.hidden, self.cell) = self.arch(packed_sequence, (self.hidden, self.cell))
+        lstm_out = rnn_utils.pad_packed_sequence(lstm_out)[0]
+        lstm_out = lstm_out.permute(1, 0, 2)
+
+        col_list = []
+        for m in range(len(packed_lengths)):
+            row_list = []
+            for n in range(max(packed_lengths)):
+                if torch.sum(lstm_out[m][n]) != 0:
+                    row_list.append(torch.cat((lstm_out[m][n], lstm_out[m][self.sorted_idxs[m][0]])))
+                else:
+                    row_list.append(torch.zeros(4*self.hidden_size))
+            row_tensor = torch.stack([x for x in row_list])
+ 
+            col_list.append(row_tensor)
+        pred_tensor = torch.stack([x for x in col_list])
+
+                
         role_space = self.cell_to_role(pred_tensor)
-        #print("role_space shape is", role_space.shape)
-
         role_scores = F.log_softmax(role_space, dim = 2)
-        #print("role_scores shape is", role_scores.shape)
-        #print("checkpoint")
 
-        return role_scores #, torch.topk(scores, 1)[1]
-        
+        return role_scores, packed_lengths, order_list
         
         
 my_model = SynAg(w2i, p2i, l2i, r2i, words, pos, lems, 512, 512, 1)
-loss_function = nn.NLLLoss()
+my_model.cuda()
 optimizer = optim.SGD(my_model.parameters(), lr=0.01)
+loss_function = nn.NLLLoss()
 
-for epoch in range(10):
-    print(epoch)
-    for sent in train_sents[0:50]:
-        sent_preds = [x for x in sent if x[3] == 'Y']
+for epoch in range(1):
+
+    t_loss = 0
+
+    for k in range(5): 
+        start = time.time()
+
+        batch = train_sents[50*k:50*(k+1)]
+
+        optimizer.zero_grad()
     
-        targs = utils2009.extract_targets(sent, sent_preds, r2i)
+        scores, p_lengths, order_list = my_model(batch)
     
-        my_model.zero_grad()
-        scores = my_model(sent, sent_preds)
-        n_scores = scores.permute(0, 2, 1)
+        sen_list = []
+        for i in range(len(p_lengths)):
+            sen_list.append(scores[i][:p_lengths[i]])  
+
+        targ_list = []
+        
+        for x in order_list:
+            #print(x)
+            targets = utils2009.get_targets(batch[x[0]], r2i, x[1])
+            targ_list.append(targets)
+        
+        targ_batch = rnn_utils.pack_sequence([x for x in targ_list])
+        sen_batch = rnn_utils.pack_sequence([x for x in sen_list])
     
-        loss = loss_function(n_scores, targs)
+        loss = loss_function(sen_batch.data, targ_batch.data)
+    
         print(loss)
+        t_loss += loss.item()
         loss.backward()
         optimizer.step()
+        print(time.time() - start)
     
+    print(t_loss)
+
     
+'''
 ## Predictions    
 correct = 0
 total = 0
@@ -159,3 +220,5 @@ for sent in train_sents[50:100]:
                 correct +=1
                 
 print("accuracy =", (100.0*correct)/total)
+
+'''
