@@ -25,11 +25,11 @@ external_embedding = {line.split(' ')[0]: [float(f) for f in line.strip().split(
                             external_embedding_fp}
 external_embedding_fp.close()
 
-ext_train_data = '/homes/jds76/virtualenv/Project/data/2012_train.gold_conll'
-ext_dev_data = '/homes/jds76/virtualenv/Project/data/2012_train.gold_conll'
-ext_test_data = '/homes/jds76/virtualenv/Project/data/2012_test.gold_conll'
+ext_train_data = #Path to file
+ext_dev_data = #Path to file
+ext_test_data = #Path to file
 
-train_data = '/homes/jds76/virtualenv/Project/data/conll-formatted-ontonotes-5.0/data/train/data/english/annotations/bc/cnn/00/cnn_0001.gold_conll'
+train_data = #Path to file
 
 
 imp.reload(utils2012)
@@ -61,15 +61,12 @@ class SynAg(nn.Module):
         
         self.arch = nn.LSTM(input_size=316, hidden_size = self.hidden_size, num_layers = self.num_layers, bidirectional = True, batch_first= True )
         
-        self.cell_to_role = nn.Linear(4*self.hidden_size, len(r2i), bias = False)
-        
-        
+        self.cell_to_role = nn.Linear(4*self.hidden_size, len(r2i), bias = False)     
 
     def repn(self, sents):
         count = 0
         pred_count = 0
         sent_count = 0
-
         rep_dict = {}
         rep_len = {}
   
@@ -80,17 +77,12 @@ class SynAg(nn.Module):
         
         for sent in sents:         
             sent_preds = [x for x in sent if 'V*' in x[3]]
-            
             ord_pred_count = 0
             
-            
             for pred in sent_preds:
-                #rep_tensor = torch.randn(len(sent), 316)
                 rep_list = []
-                
-                
+                ord_pred_count +=1
 
-                n = 0
                 for word in sent:
                     if normalize(word[0][0]) in self.w2i:
                         ran_word_emb = self.word_emb(torch.tensor(self.w2i[normalize(word[0][0])]))
@@ -108,25 +100,21 @@ class SynAg(nn.Module):
                         pre_word_emb = torch.randn(100)
             
                     if word[0][0] == pred[0][0]:
+                        
                         if word[1] in self.l2i:
                             ran_lem_emb = self.lem_emb(torch.tensor(self.l2i[word[1]]))
                         else:
                             ran_lem_emb = torch.randn(100)
                         self.pred_idxs_dict[pred_count] = (sent.index(word), sent_count)
                         pred_count += 1
-                        ord_pred_count +=1
-                
+                    
                     else:
                         ran_lem_emb = torch.zeros((100))
                     
-                    ran_pos_emb = self.pos_emb(torch.tensor(self.p2i[word[2]]))
-            
+                    ran_pos_emb = self.pos_emb(torch.tensor(self.p2i[word[2]]))            
                     new_ent = torch.cat((ran_word_emb, pre_emb, ran_lem_emb, ran_pos_emb))
 
-                    #rep_tensor[n] = new_ent
                     rep_list.append(new_ent)
-
-                    n = n + 1
                 
                 rep_tensor = torch.stack([x for x in rep_list])
                 rep_dict[count] = rep_tensor
@@ -139,23 +127,17 @@ class SynAg(nn.Module):
             sent_order_count +=1
             
         sorted_lengths = sorted(rep_len.items(), key=operator.itemgetter(1), reverse=True)
-        #print(sorted_lengths)
         sorted_sentences = [rep_dict[x[0]] for x in sorted_lengths]
         sent_lens = [x.shape[0] for x in sorted_sentences]
         
-        #padded_seq = rnn_utils.pad_sequence(sorted_sentences, batch_first=True)
-        #packed_seq = rnn_utils.pack_padded_sequence(padded_seq, sent_lens, batch_first=True)
+
         packed_seq = rnn_utils.pack_sequence(sorted_sentences)
         
         self.sorted_idxs = [self.pred_idxs_dict[x[0]] for x in sorted_lengths]
         sent_order_list = [sent_order_dict[x[0]] for x in sorted_lengths]
-
-            
-        return packed_seq, sent_lens, sent_order_list
-    
+        return packed_seq, sent_lens, sent_order_list    
 
     def forward(self, sents):
-
         packed_sequence, packed_lengths, order_list = self.repn(sents)     
         
         self.hidden = torch.randn(2*self.num_layers, len(packed_lengths), self.hidden_size)
@@ -164,36 +146,34 @@ class SynAg(nn.Module):
         lstm_out, (self.hidden, self.cell) = self.arch(packed_sequence, (self.hidden, self.cell))
         lstm_out = rnn_utils.pad_packed_sequence(lstm_out)[0]
         lstm_out = lstm_out.permute(1, 0, 2)
-       
-        #pred_tensor = torch.zeros(len(packed_lengths), max(packed_lengths), 4*self.hidden_size)
-        #print("pred_tensor shape is ", pred_tensor.shape)
+
         col_list = []
         for m in range(len(packed_lengths)):
             row_list = []
             for n in range(max(packed_lengths)):
                 if torch.sum(lstm_out[m][n]) != 0:
-                    #pred_tensor[m][n] = torch.cat((lstm_out[m][n], lstm_out[m][self.sorted_idxs[m][0]]))
                     row_list.append(torch.cat((lstm_out[m][n], lstm_out[m][self.sorted_idxs[m][0]])))
                 else:
                     row_list.append(torch.zeros(4*self.hidden_size))
             row_tensor = torch.stack([x for x in row_list])
-            #print("row_tensor shape is ", row_tensor.shape)
+ 
             col_list.append(row_tensor)
         pred_tensor = torch.stack([x for x in col_list])
-        #print("col_tensor shape is", col_tensor.shape)
+        
+        #pred_tensor = torch.randn(len(packed_lengths), max(packed_lengths), 4*self.hidden_size)
+        #for m in range(len(packed_lengths)):
+            #for n in range(max(packed_lengths)):
+                #if torch.sum(lstm_out[m][n]) != 0:
+                    #pred_tensor[m][n] = torch.cat((lstm_out[m][n], lstm_out[m][self.sorted_idxs[m][0]]))
+                
                 
         role_space = self.cell_to_role(pred_tensor)
         role_scores = F.log_softmax(role_space, dim = 2)
         
-        #print("lstm_output shape is ", lstm_out.shape)
-        #print("shape of pred_tensor", pred_tensor.shape)
-        #print("role_space shape is", role_space.shape)
-        #print("role_scores shape is", role_scores.shape)
-        #print("checkpoint")
-
-        #return role_scores
-        #return role_space
+      
         return role_scores, packed_lengths, order_list#, self.sorted_idxs
+        
+        
 
       
 
@@ -201,44 +181,54 @@ def get_targets(sent, roles, pred_num):
     target = []
     for i in range(len(sent)):
         target.append(roles[sent[i][3][pred_num]])
-
     return torch.tensor(target)
       
         
 my_model = SynAg(w2i, p2i, l2i, r2i, words, pos, lems, 512, 512, 4)
 my_model.cuda()
 
-
-
+optimizer = optim.SGD(my_model.parameters(), lr=0.01)
 loss_function = nn.NLLLoss()
 
+start = time.time()
 
 
-for k in range(1):
+for epoch in range(10):
+
+    t_loss = 0
+
+    for k in range(5): 
+
+        batch = train_sentences[50*k:50*(k+1)]
+
+        optimizer.zero_grad()
     
-    start = time.time()
-
-    #batch = train_sentences[10*k:10*(k+1)]
-    batch = train_sentences[:50]
-    scores, p_lengths, order_list = my_model(batch)
+        scores, p_lengths, order_list = my_model(batch)
     
-    print(time.time() - start)
-    
-    print(len(p_lengths))
+        sen_list = []
+        for i in range(len(p_lengths)):
+            sen_list.append(scores[i][:p_lengths[i]])  
 
-    sen_list = []
-    for i in range(len(p_lengths)):
-        sen_list.append(scores[i][:p_lengths[i]])
+        targ_list = []
         
-
-    j = 0        
+        for x in order_list:
+            #print(x)
+            targets = get_targets(batch[x[0]], r2i, x[1])
+            targ_list.append(targets)
         
-    for x in order_list:
-        targets = get_targets(batch[x[0]], r2i, x[1])
-        #print(targets.shape)
-        loss = loss_function(sen_list[j], targets)
-        j+=1
+        targ_batch = rnn_utils.pack_sequence([x for x in targ_list])
+        sen_batch = rnn_utils.pack_sequence([x for x in sen_list])
     
+        loss = loss_function(sen_batch.data, targ_batch.data)
+    
+        #print(loss)
+        t_loss += loss.item()
+        loss.backward()
+        optimizer.step()
+    
+    print(t_loss)
+    
+print(time.time() - start)
 
 
 
