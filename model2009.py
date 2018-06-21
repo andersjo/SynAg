@@ -34,6 +34,9 @@ train_sents = utils2009.extract_sent(train_data, external_embedding)
 dev_sents = utils2009.extract_sent(dev_data, external_embedding)
 role_list = list(r2i.keys())
 
+
+
+
 class SynAg(nn.Module):
     def __init__(self, w2i, p2i, l2i, r2i, word_vocab, pos_vocab, lem_vocab, hidden_size, cell_size, num_layers):
         super().__init__()
@@ -60,6 +63,10 @@ class SynAg(nn.Module):
         self.cell_to_role = nn.Linear(4*self.hidden_size, len(r2i), bias = False)     
 
     def repn(self, sents):
+        
+        ### Here I define a bunch or dictinaries and counting variables to keep track of the order of the input sentences given
+        ### that I have to reorder them to make use of the packing function.
+      
         count = 0
         pred_count = 0
         sent_count = 0
@@ -76,8 +83,8 @@ class SynAg(nn.Module):
             ord_pred_count = 0
             
             for pred in sent_preds:
-                rep_list = []
-                ord_pred_count +=1
+                rep_list = []      # I add the word representations to this list
+                ord_pred_count +=1  # This keeps track of what number predicate in the sentence the word representation is being built with respect to
 
                 for word in sent:
                     if utils2009.normalize(word[0][0]) in self.w2i:
@@ -122,7 +129,7 @@ class SynAg(nn.Module):
             sent_count +=1
             sent_order_count +=1
             
-        sorted_lengths = sorted(rep_len.items(), key=operator.itemgetter(1), reverse=True)
+        sorted_lengths = sorted(rep_len.items(), key=operator.itemgetter(1), reverse=True)   
         sorted_sentences = [rep_dict[x[0]] for x in sorted_lengths]
         sent_lens = [x.shape[0] for x in sorted_sentences]
         packed_seq = rnn_utils.pack_sequence(sorted_sentences)
@@ -142,7 +149,7 @@ class SynAg(nn.Module):
         lstm_out = rnn_utils.pad_packed_sequence(lstm_out)[0]
         lstm_out = lstm_out.permute(1, 0, 2)
 
-        col_list = []
+        col_list = []                             ###This was my new way of making a tensor of predictions without initialising an empty tensor
         for m in range(len(packed_lengths)):
             row_list = []
             for n in range(max(packed_lengths)):
@@ -182,7 +189,7 @@ for epoch in range(1):
     
         sen_list = []
         for i in range(len(p_lengths)):
-            sen_list.append(scores[i][:p_lengths[i]])  
+            sen_list.append(scores[i][:p_lengths[i]])  ## This gets rid of the trailing zeros in the padded sentences
 
         targ_list = []
         
@@ -191,12 +198,12 @@ for epoch in range(1):
             targets = utils2009.get_targets(batch[x[0]], r2i, x[1])
             targ_list.append(targets)
         
-        targ_batch = rnn_utils.pack_sequence([x for x in targ_list])
+        targ_batch = rnn_utils.pack_sequence([x for x in targ_list])  ### here I rebatch the predictions and targets
         sen_batch = rnn_utils.pack_sequence([x for x in sen_list])
     
         loss = loss_function(sen_batch.data, targ_batch.data)
     
-        print(loss)
+        print(loss)    # I recall the suggestion of dividing the loss by the expanded number of sentences in the batch - I can add this
         t_loss += loss.item()
         loss.backward()
         optimizer.step()
