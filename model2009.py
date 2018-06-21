@@ -4,13 +4,20 @@ from pathlib import Path
 import shutil
 import torch.nn as nn
 import torch.nn.functional as F
+# from torch.nn import Parameter
 from torch.nn.init import *
 from torch import optim
 from operator import itemgetter
 import numpy as np
-
 import utils2009
 import imp
+import time
+import operator
+from operator import itemgetter
+import torch.nn.utils.rnn as rnn_utils
+
+torch.set_default_tensor_type('torch.cuda.FloatTensor')
+
 imp.reload(utils2009)
 
 external_embedding_fp = open('../sskip.100.vectors', 'r')
