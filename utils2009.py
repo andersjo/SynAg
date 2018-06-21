@@ -97,9 +97,9 @@ def extract_sent(data, emb_dict):
     
     return sent_list
 
-def extract_targets(sent, preds, roles):
-    target_tensor = torch.zeros(len(preds), len(sent))
-    for i in range(len(preds)):
-        for j in range(len(sent)):
-            target_tensor[i][j] = roles[sent[j][4][i]]
-    return torch.tensor(target_tensor, dtype=torch.long)
+def get_targets(sent, roles, pred_num):
+    target = []
+    for i in range(len(sent)):
+        target.append(roles[sent[i][4][pred_num]])
+
+    return torch.tensor(target)
